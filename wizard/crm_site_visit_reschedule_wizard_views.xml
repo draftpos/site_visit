@@ -13,7 +13,8 @@
                         <field name="visit_id" invisible="1"/>
                         <field name="current_date" string="Current Scheduled Date"/>
                         <field name="new_date" string="New Target Date" required="1"/>
-                        <field name="person_going_id" string="Person Going"/>
+                        <field name="person_going_ids" widget="many2many_avatar_user" string="Persons Going" placeholder="Select persons going..."/>
+                        <field name="person_going_id" invisible="1"/>
                     </group>
                 </group>
                 <group string="Rescheduling Note">
