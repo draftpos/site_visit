@@ -75,6 +75,38 @@ class CrmSiteVisit(models.Model):
         tracking=True
     )
 
+    is_overdue = fields.Boolean(
+        string='Overdue / Surpassed Deadline',
+        compute='_compute_is_overdue',
+        search='_search_is_overdue',
+        help='True if the site visit date has passed without being marked as visited or cancelled.'
+    )
+
+    @api.depends('state', 'date_booked')
+    def _compute_is_overdue(self):
+        now = fields.Datetime.now()
+        for record in self:
+            record.is_overdue = bool(
+                record.state in ('open', 'rescheduled') and
+                record.date_booked and
+                record.date_booked < now
+            )
+
+    def _search_is_overdue(self, operator, value):
+        now = fields.Datetime.now()
+        is_true = (operator == '=' and value) or (operator == '!=' and not value)
+        if is_true:
+            return [
+                ('state', 'in', ['open', 'rescheduled']),
+                ('date_booked', '<', now)
+            ]
+        else:
+            return [
+                '|',
+                ('state', 'not in', ['open', 'rescheduled']),
+                ('date_booked', '>=', now)
+            ]
+
     # --- Visit Execution & Outcome Fields (populated once visit occurs) ---
     actual_visitor_id = fields.Many2one(
         'res.users',
@@ -184,3 +216,35 @@ class CrmSiteVisit(models.Model):
                 'default_person_going_id': self.user_id.id if self.user_id else False,
             }
         }
+
+    @api.model
+    def _cron_check_overdue_visits(self):
+        """Monitors overdue site visits and schedules warning activities for assigned users."""
+        now = fields.Datetime.now()
+        overdue_visits = self.search([
+            ('state', 'in', ['open', 'rescheduled']),
+            ('date_booked', '<', now)
+        ])
+        todo_activity_type = self.env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
+        activity_type_id = todo_activity_type.id if todo_activity_type else False
+
+        for visit in overdue_visits:
+            # Check if an overdue activity was already scheduled on this visit
+            existing = visit.activity_ids.filtered(
+                lambda a: 'Overdue Site Visit' in (a.summary or '')
+            )
+            if not existing and visit.user_id:
+                try:
+                    visit.activity_schedule(
+                        activity_type_id=activity_type_id or self.env.ref('mail.mail_activity_data_warning').id,
+                        summary=_('Overdue Site Visit: %s') % (visit.name,),
+                        note=_(
+                            'This site visit scheduled for %s has passed its scheduled date and has not been marked as visited or rescheduled. '
+                            'Please visit the site, record visit details, or reschedule.'
+                        ) % (visit.date_booked,),
+                        user_id=visit.user_id.id,
+                        date_deadline=fields.Date.context_today(visit),
+                    )
+                except Exception:
+                    pass
+        return True

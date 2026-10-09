@@ -18,6 +18,7 @@ CRM Site Visits Management
     'data': [
         'security/ir.model.access.csv',
         'data/crm_site_visit_sequence.xml',
+        'data/crm_site_visit_cron.xml',
         'wizard/crm_site_visit_reschedule_wizard_views.xml',
         'views/crm_site_visit_views.xml',
         'views/crm_lead_views.xml',

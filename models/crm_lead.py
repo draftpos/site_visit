@@ -39,6 +39,7 @@ class CrmLead(models.Model):
             ('none', 'No Visits'),
             ('open', 'Open / Scheduled'),
             ('rescheduled', 'Rescheduled'),
+            ('overdue', 'Overdue / Surpassed Deadline'),
             ('done', 'Visited / Done'),
             ('cancelled', 'Cancelled'),
         ],
@@ -47,7 +48,7 @@ class CrmLead(models.Model):
         store=True
     )
 
-    @api.depends('site_visit_ids', 'site_visit_ids.state')
+    @api.depends('site_visit_ids', 'site_visit_ids.state', 'site_visit_ids.date_booked', 'site_visit_ids.is_overdue')
     def _compute_site_visits(self):
         for lead in self:
             lead.site_visit_count = len(lead.site_visit_ids)
@@ -56,7 +57,10 @@ class CrmLead(models.Model):
             else:
                 open_visits = lead.site_visit_ids.filtered(lambda v: v.state in ('open', 'rescheduled'))
                 if open_visits:
-                    lead.site_visit_state = open_visits[0].state
+                    if any(v.is_overdue for v in open_visits):
+                        lead.site_visit_state = 'overdue'
+                    else:
+                        lead.site_visit_state = open_visits[0].state
                 else:
                     lead.site_visit_state = lead.site_visit_ids[0].state
 
