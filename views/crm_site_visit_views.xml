@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Site Visit List View -->
+    <record id="view_crm_site_visit_tree" model="ir.ui.view">
+        <field name="name">crm.site.visit.list</field>
+        <field name="model">crm.site.visit</field>
+        <field name="arch" type="xml">
+            <list string="Site Visits" default_order="date_booked desc, id desc"
+                  decoration-success="state == 'done'"
+                  decoration-warning="state == 'rescheduled'"
+                  decoration-info="state == 'open'"
+                  decoration-muted="state == 'cancelled'"
+                  sample="1">
+                <field name="name" string="Ref"/>
+                <field name="lead_id" string="Lead / Opportunity"/>
+                <field name="partner_id" string="Customer"/>
+                <field name="date_booked" string="Date Booked"/>
+                <field name="user_id" string="Person Going" widget="many2one_avatar_user"/>
+                <field name="address" string="Site Address"/>
+                <field name="reschedule_count" string="Reschedules" optional="show"/>
+                <field name="state" string="Status" widget="badge"
+                       decoration-success="state == 'done'"
+                       decoration-warning="state == 'rescheduled'"
+                       decoration-info="state == 'open'"
+                       decoration-muted="state == 'cancelled'"/>
+                <field name="people_seen_count" string="Persons Seen" optional="show"/>
+                <field name="actual_visitor_id" string="Actual Visitor" optional="hide"/>
+                <field name="date_visited" string="Date Visited" optional="hide"/>
+                <button name="action_mark_done" type="object" string="Mark Done" class="btn-success btn-sm" invisible="state in ('done', 'cancelled')"/>
+                <button name="action_open_reschedule_wizard" type="object" string="Reschedule" class="btn-warning btn-sm" invisible="state in ('done', 'cancelled')"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Site Visit Form View -->
+    <record id="view_crm_site_visit_form" model="ir.ui.view">
+        <field name="name">crm.site.visit.form</field>
+        <field name="model">crm.site.visit</field>
+        <field name="arch" type="xml">
+            <form string="Site Visit">
+                <header>
+                    <button name="action_mark_done" type="object" string="Mark as Visited / Done" class="btn-primary" invisible="state == 'done'"/>
+                    <button name="action_open_reschedule_wizard" type="object" string="Reschedule" class="btn-secondary" invisible="state in ('done', 'cancelled')"/>
+                    <button name="action_set_open" type="object" string="Reopen Visit" class="btn-secondary" invisible="state in ('open', 'rescheduled')"/>
+                    <button name="action_cancel" type="object" string="Cancel" class="btn-secondary" invisible="state == 'cancelled'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="open,rescheduled,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <span class="o_form_label">Site Visit Reference</span>
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+
+                    <group>
+                        <group string="Booking &amp; Location">
+                            <field name="lead_id" string="Lead / Opportunity" options="{'no_create': True}" required="not context.get('default_lead_id')"/>
+                            <field name="partner_id" string="Customer / Company"/>
+                            <field name="date_booked" string="Date Booked"/>
+                            <field name="original_date" string="Original Booking Date" invisible="not original_date or original_date == date_booked"/>
+                            <field name="user_id" string="Person Going" widget="many2one_avatar_user"/>
+                            <field name="address" string="Site Address" placeholder="Street, suburb, town, landmarks..."/>
+                        </group>
+
+                        <group string="Rescheduling &amp; Execution Tracking">
+                            <field name="reschedule_count" string="Reschedule Count"/>
+                            <field name="reschedule_reason" string="Last Reschedule Reason" invisible="reschedule_count == 0"/>
+                            <field name="actual_visitor_id" string="Person Who Went" widget="many2one_avatar_user"/>
+                            <field name="date_visited" string="Date Visited"/>
+                            <field name="people_seen_count" string="Number of Persons Seen"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Visit Notes &amp; Outcome" name="visit_notes">
+                            <field name="notes" placeholder="Enter brief notes about what was discussed, site measurements, who was present, next steps..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Site Visit Calendar View -->
+    <record id="view_crm_site_visit_calendar" model="ir.ui.view">
+        <field name="name">crm.site.visit.calendar</field>
+        <field name="model">crm.site.visit</field>
+        <field name="arch" type="xml">
+            <calendar string="Site Visits" date_start="date_booked" color="user_id" mode="month">
+                <field name="name"/>
+                <field name="lead_id"/>
+                <field name="user_id"/>
+                <field name="state"/>
+            </calendar>
+        </field>
+    </record>
+
+    <!-- Site Visit Search / Filter View -->
+    <record id="view_crm_site_visit_search" model="ir.ui.view">
+        <field name="name">crm.site.visit.search</field>
+        <field name="model">crm.site.visit</field>
+        <field name="arch" type="xml">
+            <search string="Search Site Visits">
+                <field name="name" string="Ref"/>
+                <field name="lead_id" string="Lead / Opportunity"/>
+                <field name="partner_id" string="Customer"/>
+                <field name="user_id" string="Person Going"/>
+                <field name="actual_visitor_id" string="Person Who Went"/>
+                <field name="address" string="Site Address"/>
+
+                <separator/>
+                <filter string="Open / Waiting to be Done" name="filter_open" domain="[('state', 'in', ['open', 'rescheduled'])]"/>
+                <filter string="Closed / Visited" name="filter_done" domain="[('state', '=', 'done')]"/>
+                <filter string="Rescheduled" name="filter_rescheduled" domain="[('state', '=', 'rescheduled')]"/>
+                <separator/>
+                <filter string="My Assigned Visits" name="filter_my_visits" domain="['|', ('user_id', '=', uid), ('actual_visitor_id', '=', uid)]"/>
+                <separator/>
+                <filter string="Date Booked" name="filter_date_booked" date="date_booked"/>
+
+                <group>
+                    <filter string="Status" name="group_by_state" context="{'group_by': 'state'}"/>
+                    <filter string="Person Going" name="group_by_user" context="{'group_by': 'user_id'}"/>
+                    <filter string="Lead / Opportunity" name="group_by_lead" context="{'group_by': 'lead_id'}"/>
+                    <filter string="Date Booked" name="group_by_date" context="{'group_by': 'date_booked:day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Main Site Visits Action -->
+    <record id="action_crm_site_visit" model="ir.actions.act_window">
+        <field name="name">Site Visits</field>
+        <field name="res_model">crm.site.visit</field>
+        <field name="view_mode">list,calendar,form</field>
+        <field name="context">{'search_default_filter_open': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Book your first Site Visit!
+            </p>
+            <p>
+                Schedule visits, track reps dispatched to client sites, manage reschedules, and record visit outcomes.
+            </p>
+        </field>
+    </record>
+
+    <!-- Top-Level Menu under CRM -->
+    <menuitem id="menu_crm_site_visit"
+              name="Site Visits"
+              parent="crm.crm_menu_root"
+              action="action_crm_site_visit"
+              sequence="6"/>
+
+</odoo>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_crm_site_visit_reschedule_wizard_form" model="ir.ui.view">
+        <field name="name">crm.site.visit.reschedule.wizard.form</field>
+        <field name="model">crm.site.visit.reschedule.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Reschedule Site Visit">
+                <div class="alert alert-info" role="alert">
+                    <strong>Reschedule Visit:</strong> Record the new target date and the reason for rescheduling.
+                </div>
+                <group>
+                    <group string="Date &amp; Schedule">
+                        <field name="visit_id" invisible="1"/>
+                        <field name="current_date" string="Current Scheduled Date"/>
+                        <field name="new_date" string="New Target Date" required="1"/>
+                        <field name="person_going_id" string="Person Going"/>
+                    </group>
+                </group>
+                <group string="Rescheduling Note">
+                    <field name="reason" placeholder="e.g., Client requested postponement to Friday due to director unavailability..." required="1"/>
+                </group>
+                <footer>
+                    <button name="action_confirm_reschedule" type="object" string="Confirm Reschedule" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>
