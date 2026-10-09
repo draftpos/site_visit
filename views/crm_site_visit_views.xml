@@ -18,7 +18,8 @@
                 <field name="lead_id" string="Lead / Opportunity"/>
                 <field name="partner_id" string="Customer"/>
                 <field name="date_booked" string="Date Booked"/>
-                <field name="user_id" string="Person Going" widget="many2one_avatar_user"/>
+                <field name="user_ids" string="Persons Going" widget="many2many_avatar_user"/>
+                <field name="user_id" column_invisible="True"/>
                 <field name="address" string="Site Address"/>
                 <field name="reschedule_count" string="Reschedules" optional="show"/>
                 <field name="is_overdue" string="Overdue" widget="badge"
@@ -32,7 +33,8 @@
                        decoration-info="state == 'open'"
                        decoration-muted="state == 'cancelled'"/>
                 <field name="people_seen_count" string="Persons Seen" optional="show"/>
-                <field name="actual_visitor_id" string="Actual Visitor" optional="hide"/>
+                <field name="actual_visitor_ids" string="Actual Visitors" widget="many2many_avatar_user" optional="hide"/>
+                <field name="actual_visitor_id" column_invisible="True"/>
                 <field name="date_visited" string="Date Visited" optional="hide"/>
                 <button name="action_mark_done" type="object" string="Mark Done" class="btn-success btn-sm" invisible="state in ('done', 'cancelled')"/>
                 <button name="action_open_reschedule_wizard" type="object" string="Reschedule" class="btn-warning btn-sm" invisible="state in ('done', 'cancelled')"/>
@@ -71,14 +73,16 @@
                             <field name="partner_id" string="Customer / Company"/>
                             <field name="date_booked" string="Date Booked"/>
                             <field name="original_date" string="Original Booking Date" invisible="not original_date or original_date == date_booked"/>
-                            <field name="user_id" string="Person Going" widget="many2one_avatar_user"/>
+                            <field name="user_ids" string="Persons Going" widget="many2many_avatar_user" placeholder="Select representatives going..."/>
+                            <field name="user_id" invisible="True"/>
                             <field name="address" string="Site Address" placeholder="Street, suburb, town, landmarks..."/>
                         </group>
 
                         <group string="Rescheduling &amp; Execution Tracking">
                             <field name="reschedule_count" string="Reschedule Count"/>
                             <field name="reschedule_reason" string="Last Reschedule Reason" invisible="reschedule_count == 0"/>
-                            <field name="actual_visitor_id" string="Person Who Went" widget="many2one_avatar_user"/>
+                            <field name="actual_visitor_ids" string="Persons Who Went" widget="many2many_avatar_user" placeholder="Select representatives who went..."/>
+                            <field name="actual_visitor_id" invisible="True"/>
                             <field name="date_visited" string="Date Visited"/>
                             <field name="people_seen_count" string="Number of Persons Seen"/>
                         </group>
@@ -118,8 +122,8 @@
                 <field name="name" string="Ref"/>
                 <field name="lead_id" string="Lead / Opportunity"/>
                 <field name="partner_id" string="Customer"/>
-                <field name="user_id" string="Person Going"/>
-                <field name="actual_visitor_id" string="Person Who Went"/>
+                <field name="user_ids" string="Persons Going"/>
+                <field name="actual_visitor_ids" string="Persons Who Went"/>
                 <field name="address" string="Site Address"/>
 
                 <separator/>
@@ -128,7 +132,7 @@
                 <filter string="Closed / Visited" name="filter_done" domain="[('state', '=', 'done')]"/>
                 <filter string="Rescheduled" name="filter_rescheduled" domain="[('state', '=', 'rescheduled')]"/>
                 <separator/>
-                <filter string="My Assigned Visits" name="filter_my_visits" domain="['|', ('user_id', '=', uid), ('actual_visitor_id', '=', uid)]"/>
+                <filter string="My Assigned Visits" name="filter_my_visits" domain="['|', ('user_ids', 'in', [uid]), ('actual_visitor_ids', 'in', [uid])]"/>
                 <separator/>
                 <filter string="Date Booked" name="filter_date_booked" date="date_booked"/>
 
