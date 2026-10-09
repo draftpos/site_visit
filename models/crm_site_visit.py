@@ -47,12 +47,24 @@ class CrmSiteVisit(models.Model):
         copy=False,
         help='Initial scheduled date before any reschedules.'
     )
+    user_ids = fields.Many2many(
+        'res.users',
+        'crm_site_visit_user_rel',
+        'visit_id',
+        'user_id',
+        string='Persons Going',
+        default=lambda self: [self.env.user.id],
+        tracking=True,
+        domain="[('share', '=', False), ('active', '=', True)]",
+        help='Representatives or team members scheduled to attend the site visit.'
+    )
     user_id = fields.Many2one(
         'res.users',
-        string='Person Going',
+        string='Lead / Primary Person Going',
         default=lambda self: self.env.user,
         tracking=True,
-        domain="[('share', '=', False), ('active', '=', True)]"
+        domain="[('share', '=', False), ('active', '=', True)]",
+        help='Primary person responsible for leading the visit.'
     )
 
     state = fields.Selection([
@@ -108,6 +120,16 @@ class CrmSiteVisit(models.Model):
             ]
 
     # --- Visit Execution & Outcome Fields (populated once visit occurs) ---
+    actual_visitor_ids = fields.Many2many(
+        'res.users',
+        'crm_site_visit_actual_visitor_rel',
+        'visit_id',
+        'user_id',
+        string='Persons Who Went',
+        tracking=True,
+        domain="[('share', '=', False), ('active', '=', True)]",
+        help='Team members or representatives who physically attended the visit.'
+    )
     actual_visitor_id = fields.Many2one(
         'res.users',
         string='Person Who Went',
@@ -118,6 +140,21 @@ class CrmSiteVisit(models.Model):
         string='Date Visited',
         tracking=True
     )
+
+    @api.onchange('user_ids')
+    def _onchange_user_ids(self):
+        if self.user_ids and not self.user_id:
+            self.user_id = self.user_ids[0]
+        elif self.user_ids and self.user_id not in self.user_ids:
+            self.user_id = self.user_ids[0]
+        elif not self.user_ids:
+            self.user_id = False
+
+    @api.onchange('user_id')
+    def _onchange_user_id(self):
+        if self.user_id and self.user_id not in self.user_ids:
+            self.user_ids = [(4, self.user_id.id)]
+
     people_seen_count = fields.Integer(
         string='Number of Persons Seen',
         tracking=True,
@@ -163,6 +200,9 @@ class CrmSiteVisit(models.Model):
                 vals['name'] = self.env['ir.sequence'].next_by_code('crm.site.visit') or _('New')
             if 'date_booked' in vals and not vals.get('original_date'):
                 vals['original_date'] = vals['date_booked']
+            # Synchronize user_ids and primary user_id
+            if vals.get('user_id') and not vals.get('user_ids'):
+                vals['user_ids'] = [(4, vals['user_id'])]
             # Default partner_id and address from lead if blank
             if vals.get('lead_id'):
                 lead = self.env['crm.lead'].browse(vals['lead_id'])
@@ -181,11 +221,14 @@ class CrmSiteVisit(models.Model):
             vals = {'state': 'done'}
             if not record.date_visited:
                 vals['date_visited'] = fields.Datetime.now()
+            if not record.actual_visitor_ids and record.user_ids:
+                vals['actual_visitor_ids'] = [(6, 0, record.user_ids.ids)]
             if not record.actual_visitor_id:
-                vals['actual_visitor_id'] = record.user_id or self.env.user
+                vals['actual_visitor_id'] = record.user_id or (record.user_ids[0] if record.user_ids else self.env.user)
             record.write(vals)
+            visitors = ", ".join(record.actual_visitor_ids.mapped('name')) or record.actual_visitor_id.name or self.env.user.name
             record.message_post(
-                body=_("Site visit marked as <b>Completed / Visited</b> by %s.") % (record.actual_visitor_id.name or self.env.user.name),
+                body=_("Site visit marked as <b>Completed / Visited</b> by %s.") % (visitors,),
                 subtype_xmlid='mail.mt_note'
             )
 
@@ -214,6 +257,7 @@ class CrmSiteVisit(models.Model):
                 'default_visit_id': self.id,
                 'default_new_date': self.date_booked,
                 'default_person_going_id': self.user_id.id if self.user_id else False,
+                'default_person_going_ids': [(6, 0, self.user_ids.ids)],
             }
         }
 
@@ -229,22 +273,23 @@ class CrmSiteVisit(models.Model):
         activity_type_id = todo_activity_type.id if todo_activity_type else False
 
         for visit in overdue_visits:
-            # Check if an overdue activity was already scheduled on this visit
-            existing = visit.activity_ids.filtered(
-                lambda a: 'Overdue Site Visit' in (a.summary or '')
-            )
-            if not existing and visit.user_id:
-                try:
-                    visit.activity_schedule(
-                        activity_type_id=activity_type_id or self.env.ref('mail.mail_activity_data_warning').id,
-                        summary=_('Overdue Site Visit: %s') % (visit.name,),
-                        note=_(
-                            'This site visit scheduled for %s has passed its scheduled date and has not been marked as visited or rescheduled. '
-                            'Please visit the site, record visit details, or reschedule.'
-                        ) % (visit.date_booked,),
-                        user_id=visit.user_id.id,
-                        date_deadline=fields.Date.context_today(visit),
-                    )
-                except Exception:
-                    pass
+            attendees = visit.user_ids or visit.user_id
+            for user in attendees:
+                existing = visit.activity_ids.filtered(
+                    lambda a: 'Overdue Site Visit' in (a.summary or '') and a.user_id == user
+                )
+                if not existing:
+                    try:
+                        visit.activity_schedule(
+                            activity_type_id=activity_type_id or self.env.ref('mail.mail_activity_data_warning').id,
+                            summary=_('Overdue Site Visit: %s') % (visit.name,),
+                            note=_(
+                                'This site visit scheduled for %s has passed its scheduled date and has not been marked as visited or rescheduled. '
+                                'Please visit the site, record visit details, or reschedule.'
+                            ) % (visit.date_booked,),
+                            user_id=user.id,
+                            date_deadline=fields.Date.context_today(visit),
+                        )
+                    except Exception:
+                        pass
         return True
