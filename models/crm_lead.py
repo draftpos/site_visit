@@ -4,6 +4,25 @@ from odoo import api, fields, models
 
 class CrmLead(models.Model):
     _inherit = 'crm.lead'
+    _rec_names_search = ['name', 'partner_id', 'contact_name', 'partner_name', 'phone']
+
+    @api.depends('name', 'partner_id', 'partner_id.name', 'contact_name', 'partner_name', 'phone')
+    def _compute_display_name(self):
+        for lead in self:
+            lead_name = (lead.name or '').strip()
+            customer = (lead.partner_id.name or '').strip() or (lead.contact_name or '').strip() or (lead.partner_name or '').strip()
+            details = []
+            if customer and customer.lower() not in lead_name.lower():
+                details.append(customer)
+            if lead.phone and lead.phone.strip() not in lead_name and lead.phone.strip() not in customer:
+                details.append(lead.phone.strip())
+
+            if details and lead_name:
+                lead.display_name = f"{lead_name} - {', '.join(details)}"
+            elif details:
+                lead.display_name = ', '.join(details)
+            else:
+                lead.display_name = lead_name or ''
 
     site_visit_ids = fields.One2many(
         'crm.site.visit',

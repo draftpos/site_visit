@@ -118,12 +118,11 @@ class CrmSiteVisit(models.Model):
     @api.onchange('lead_id')
     def _onchange_lead_id(self):
         if self.lead_id:
-            if self.lead_id.partner_id and not self.partner_id:
+            if self.lead_id.partner_id:
                 self.partner_id = self.lead_id.partner_id
-            if not self.address:
-                addr_parts = [p for p in [self.lead_id.street, self.lead_id.street2, self.lead_id.city] if p]
-                if addr_parts:
-                    self.address = ', '.join(addr_parts)
+            addr_parts = [p for p in [self.lead_id.street, self.lead_id.street2, self.lead_id.city] if p]
+            if addr_parts:
+                self.address = ', '.join(addr_parts)
 
     @api.model_create_multi
     def create(self, vals_list):
