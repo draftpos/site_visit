@@ -79,3 +79,30 @@ class CrmLead(models.Model):
                 'default_address': ', '.join(addr_parts) if addr_parts else False,
             }
         }
+
+    @api.model
+    def _get_view(self, view_id=None, view_type='form', **options):
+        arch, view = super()._get_view(view_id=view_id, view_type=view_type, **options)
+        if view_type == 'form':
+            site_visits_nodes = arch.xpath("//page[@name='site_visits']")
+            lead_page_nodes = arch.xpath("//page[@name='lead_page']")
+            wa_chats_nodes = arch.xpath("//page[@name='wa_chats']")
+            if site_visits_nodes and (lead_page_nodes or wa_chats_nodes):
+                page_sv = site_visits_nodes[0]
+                old_parent = page_sv.getparent()
+                if lead_page_nodes:
+                    target_page = lead_page_nodes[0]
+                    target_parent = target_page.getparent()
+                    if old_parent is not None and (old_parent != target_parent or list(target_parent).index(page_sv) != list(target_parent).index(target_page) + 1):
+                        old_parent.remove(page_sv)
+                        lp_idx = list(target_parent).index(target_page)
+                        target_parent.insert(lp_idx + 1, page_sv)
+                elif wa_chats_nodes:
+                    target_page = wa_chats_nodes[0]
+                    target_parent = target_page.getparent()
+                    if old_parent is not None and (old_parent != target_parent or list(target_parent).index(page_sv) != list(target_parent).index(target_page)):
+                        old_parent.remove(page_sv)
+                        wa_idx = list(target_parent).index(target_page)
+                        target_parent.insert(wa_idx, page_sv)
+        return arch, view
+
