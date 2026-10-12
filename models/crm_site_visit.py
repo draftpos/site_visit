@@ -238,10 +238,10 @@ class CrmSiteVisit(models.Model):
         for visit in records:
             if visit.lead_id:
                 self.env.cr.execute(
-                    "UPDATE crm_lead SET write_date = NOW() AT TIME ZONE 'UTC' WHERE id = %s",
-                    (visit.lead_id.id,)
+                    "UPDATE crm_lead SET write_date = NOW() AT TIME ZONE 'UTC', write_uid = %s WHERE id = %s",
+                    (self.env.uid, visit.lead_id.id,)
                 )
-                visit.lead_id.invalidate_recordset(['write_date'])
+                visit.lead_id.invalidate_recordset(['write_date', 'write_uid'])
             if visit.lead_id and visit.date_booked and visit.state in ('open', 'rescheduled'):
                 booked_date = fields.Datetime.to_datetime(visit.date_booked).date()
                 lead = visit.lead_id
@@ -254,10 +254,10 @@ class CrmSiteVisit(models.Model):
         leads = self.mapped('lead_id')
         if leads:
             self.env.cr.execute(
-                "UPDATE crm_lead SET write_date = NOW() AT TIME ZONE 'UTC' WHERE id IN %s",
-                (tuple(leads.ids),)
+                "UPDATE crm_lead SET write_date = NOW() AT TIME ZONE 'UTC', write_uid = %s WHERE id IN %s",
+                (self.env.uid, tuple(leads.ids),)
             )
-            leads.invalidate_recordset(['write_date'])
+            leads.invalidate_recordset(['write_date', 'write_uid'])
         if 'date_booked' in vals or 'state' in vals:
             for visit in self:
                 if visit.lead_id and visit.date_booked and visit.state in ('open', 'rescheduled'):
