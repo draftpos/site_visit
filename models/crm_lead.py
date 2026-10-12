@@ -4,6 +4,7 @@ from odoo import api, fields, models
 
 class CrmLead(models.Model):
     _inherit = 'crm.lead'
+    _order = 'write_date desc, id desc'
     _rec_names_search = ['name', 'partner_id', 'contact_name', 'partner_name', 'phone']
 
     @api.depends('name', 'partner_id', 'partner_id.name', 'contact_name', 'partner_name', 'phone')

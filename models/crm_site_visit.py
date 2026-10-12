@@ -30,6 +30,15 @@ class CrmSiteVisit(models.Model):
         index=True,
         tracking=True
     )
+    city = fields.Char(
+        string='Area / City',
+        compute='_compute_city',
+        store=True,
+        readonly=False,
+        index=True,
+        tracking=True,
+        help='City, suburb or area of the site visit.'
+    )
     address = fields.Text(
         string='Site Address',
         tracking=True,
@@ -93,6 +102,12 @@ class CrmSiteVisit(models.Model):
         search='_search_is_overdue',
         help='True if the site visit date has passed without being marked as visited or cancelled.'
     )
+
+    @api.depends('lead_id.city', 'partner_id.city', 'address')
+    def _compute_city(self):
+        for record in self:
+            if not record.city:
+                record.city = record.lead_id.city or record.partner_id.city or False
 
     @api.depends('state', 'date_booked')
     def _compute_is_overdue(self):
@@ -178,6 +193,8 @@ class CrmSiteVisit(models.Model):
                     res['lead_id'] = lead.id
                 if 'partner_id' in fields_list and not res.get('partner_id') and lead.partner_id:
                     res['partner_id'] = lead.partner_id.id
+                if 'city' in fields_list and not res.get('city') and lead.city:
+                    res['city'] = lead.city
                 if 'address' in fields_list and not res.get('address'):
                     addr_parts = [p for p in [lead.street, lead.street2, lead.city] if p]
                     if addr_parts:
@@ -189,6 +206,8 @@ class CrmSiteVisit(models.Model):
         if self.lead_id:
             if self.lead_id.partner_id:
                 self.partner_id = self.lead_id.partner_id
+            if self.lead_id.city and not self.city:
+                self.city = self.lead_id.city
             addr_parts = [p for p in [self.lead_id.street, self.lead_id.street2, self.lead_id.city] if p]
             if addr_parts:
                 self.address = ', '.join(addr_parts)
@@ -203,18 +222,26 @@ class CrmSiteVisit(models.Model):
             # Synchronize user_ids and primary user_id
             if vals.get('user_id') and not vals.get('user_ids'):
                 vals['user_ids'] = [(4, vals['user_id'])]
-            # Default partner_id and address from lead if blank
+            # Default partner_id, city and address from lead if blank
             if vals.get('lead_id'):
                 lead = self.env['crm.lead'].browse(vals['lead_id'])
                 if lead.exists():
                     if not vals.get('partner_id') and lead.partner_id:
                         vals['partner_id'] = lead.partner_id.id
+                    if not vals.get('city') and lead.city:
+                        vals['city'] = lead.city
                     if not vals.get('address'):
                         addr_parts = [p for p in [lead.street, lead.street2, lead.city] if p]
                         if addr_parts:
                             vals['address'] = ', '.join(addr_parts)
         records = super().create(vals_list)
         for visit in records:
+            if visit.lead_id:
+                self.env.cr.execute(
+                    "UPDATE crm_lead SET write_date = NOW() AT TIME ZONE 'UTC' WHERE id = %s",
+                    (visit.lead_id.id,)
+                )
+                visit.lead_id.invalidate_recordset(['write_date'])
             if visit.lead_id and visit.date_booked and visit.state in ('open', 'rescheduled'):
                 booked_date = fields.Datetime.to_datetime(visit.date_booked).date()
                 lead = visit.lead_id
@@ -224,6 +251,13 @@ class CrmSiteVisit(models.Model):
 
     def write(self, vals):
         res = super().write(vals)
+        leads = self.mapped('lead_id')
+        if leads:
+            self.env.cr.execute(
+                "UPDATE crm_lead SET write_date = NOW() AT TIME ZONE 'UTC' WHERE id IN %s",
+                (tuple(leads.ids),)
+            )
+            leads.invalidate_recordset(['write_date'])
         if 'date_booked' in vals or 'state' in vals:
             for visit in self:
                 if visit.lead_id and visit.date_booked and visit.state in ('open', 'rescheduled'):

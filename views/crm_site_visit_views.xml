@@ -17,10 +17,11 @@
                 <field name="name" string="Ref"/>
                 <field name="lead_id" string="Lead / Opportunity"/>
                 <field name="partner_id" string="Customer"/>
+                <field name="city" string="Area / City" optional="show"/>
+                <field name="address" string="Site Address" optional="show"/>
                 <field name="date_booked" string="Date Booked"/>
                 <field name="user_ids" string="Persons Going" widget="many2many_avatar_user"/>
                 <field name="user_id" column_invisible="True"/>
-                <field name="address" string="Site Address"/>
                 <field name="reschedule_count" string="Reschedules" optional="show"/>
                 <field name="is_overdue" string="Overdue" widget="badge"
                        decoration-danger="is_overdue"
@@ -36,6 +37,8 @@
                 <field name="actual_visitor_ids" string="Actual Visitors" widget="many2many_avatar_user" optional="hide"/>
                 <field name="actual_visitor_id" column_invisible="True"/>
                 <field name="date_visited" string="Date Visited" optional="hide"/>
+                <field name="create_date" string="Created On" optional="hide"/>
+                <field name="write_date" string="Updated On" optional="hide"/>
                 <button name="action_mark_done" type="object" string="Mark Done" class="btn-success btn-sm" invisible="state in ('done', 'cancelled')"/>
                 <button name="action_open_reschedule_wizard" type="object" string="Reschedule" class="btn-warning btn-sm" invisible="state in ('done', 'cancelled')"/>
             </list>
@@ -75,6 +78,7 @@
                             <field name="original_date" string="Original Booking Date" invisible="not original_date or original_date == date_booked"/>
                             <field name="user_ids" string="Persons Going" widget="many2many_avatar_user" placeholder="Select representatives going..."/>
                             <field name="user_id" invisible="True"/>
+                            <field name="city" string="Area / City" placeholder="e.g. Domboshava, Norton, Kuwadzana..."/>
                             <field name="address" string="Site Address" placeholder="Street, suburb, town, landmarks..."/>
                         </group>
 
@@ -108,12 +112,13 @@
                 <field name="name"/>
                 <field name="lead_id"/>
                 <field name="user_id"/>
+                <field name="city"/>
                 <field name="state"/>
             </calendar>
         </field>
     </record>
 
-    <!-- Site Visit Search / Filter View -->
+    <!-- Site Visit Search / Filter View with Comprehensive Filters & Group By -->
     <record id="view_crm_site_visit_search" model="ir.ui.view">
         <field name="name">crm.site.visit.search</field>
         <field name="model">crm.site.visit</field>
@@ -122,25 +127,95 @@
                 <field name="name" string="Ref"/>
                 <field name="lead_id" string="Lead / Opportunity"/>
                 <field name="partner_id" string="Customer"/>
-                <field name="user_ids" string="Persons Going"/>
-                <field name="actual_visitor_ids" string="Persons Who Went"/>
+                <field name="city" string="Area / City"/>
                 <field name="address" string="Site Address"/>
+                <field name="user_ids" string="Persons Going"/>
+                <field name="user_id" string="Lead Person Going"/>
+                <field name="actual_visitor_ids" string="Persons Who Went"/>
+                <field name="reschedule_reason" string="Reschedule Reason"/>
 
                 <separator/>
+                <!-- Scheduling & Timeline Filters -->
+                <filter string="To Be Done Today" name="filter_scheduled_today"
+                        domain="[('state', 'in', ['open', 'rescheduled']),
+                                 ('date_booked', '&gt;=', context_today().strftime('%Y-%m-%d 00:00:00')),
+                                 ('date_booked', '&lt;=', context_today().strftime('%Y-%m-%d 23:59:59'))]"/>
+                <filter string="In Future / Upcoming" name="filter_future"
+                        domain="[('state', 'in', ['open', 'rescheduled']),
+                                 ('date_booked', '&gt;', context_today().strftime('%Y-%m-%d 23:59:59'))]"/>
+                <filter string="To Be Done Tomorrow" name="filter_tomorrow"
+                        domain="[('state', 'in', ['open', 'rescheduled']),
+                                 ('date_booked', '&gt;=', (context_today() + datetime.timedelta(days=1)).strftime('%Y-%m-%d 00:00:00')),
+                                 ('date_booked', '&lt;=', (context_today() + datetime.timedelta(days=1)).strftime('%Y-%m-%d 23:59:59'))]"/>
+                <filter string="To Be Done This Week" name="filter_this_week"
+                        domain="[('state', 'in', ['open', 'rescheduled']),
+                                 ('date_booked', '&gt;=', (context_today() - datetime.timedelta(days=context_today().weekday())).strftime('%Y-%m-%d 00:00:00')),
+                                 ('date_booked', '&lt;=', (context_today() + datetime.timedelta(days=6-context_today().weekday())).strftime('%Y-%m-%d 23:59:59'))]"/>
                 <filter string="Overdue / Surpassed Deadline" name="filter_overdue" domain="[('is_overdue', '=', True)]"/>
-                <filter string="Open / Waiting to be Done" name="filter_open" domain="[('state', 'in', ['open', 'rescheduled'])]"/>
-                <filter string="Closed / Visited" name="filter_done" domain="[('state', '=', 'done')]"/>
-                <filter string="Rescheduled" name="filter_rescheduled" domain="[('state', '=', 'rescheduled')]"/>
-                <separator/>
-                <filter string="My Assigned Visits" name="filter_my_visits" domain="['|', ('user_ids', 'in', [uid]), ('actual_visitor_ids', 'in', [uid])]"/>
-                <separator/>
-                <filter string="Date Booked" name="filter_date_booked" date="date_booked"/>
 
-                <group>
-                    <filter string="Status" name="group_by_state" context="{'group_by': 'state'}"/>
-                    <filter string="Person Going" name="group_by_user" context="{'group_by': 'user_id'}"/>
+                <separator/>
+                <!-- Status & Rescheduling Filters -->
+                <filter string="Open / Scheduled" name="filter_open" domain="[('state', 'in', ['open', 'rescheduled'])]"/>
+                <filter string="Rescheduled" name="filter_rescheduled" domain="[('state', '=', 'rescheduled')]"/>
+                <filter string="Has Reschedules (&gt; 0)" name="filter_has_reschedules" domain="[('reschedule_count', '&gt;', 0)]"/>
+                <filter string="Never Rescheduled" name="filter_never_rescheduled" domain="[('reschedule_count', '=', 0)]"/>
+                <filter string="Visited / Done" name="filter_done" domain="[('state', '=', 'done')]"/>
+                <filter string="Cancelled" name="filter_cancelled" domain="[('state', '=', 'cancelled')]"/>
+
+                <separator/>
+                <!-- Assignment Filters -->
+                <filter string="My Assigned Visits" name="filter_my_visits"
+                        domain="['|', ('user_ids', 'in', [uid]), ('actual_visitor_ids', 'in', [uid])]"/>
+                <filter string="My Open Visits" name="filter_my_open_visits"
+                        domain="[('state', 'in', ['open', 'rescheduled']), '|', ('user_ids', 'in', [uid]), ('actual_visitor_ids', 'in', [uid])]"/>
+                <filter string="Unassigned Visits" name="filter_unassigned" domain="[('user_ids', '=', False)]"/>
+
+                <separator/>
+                <!-- Creation & Update Filters -->
+                <filter string="Created Today" name="filter_created_today"
+                        domain="[('create_date', '&gt;=', context_today().strftime('%Y-%m-%d 00:00:00')),
+                                 ('create_date', '&lt;=', context_today().strftime('%Y-%m-%d 23:59:59'))]"/>
+                <filter string="Created This Week" name="filter_created_this_week"
+                        domain="[('create_date', '&gt;=', (context_today() - datetime.timedelta(days=context_today().weekday())).strftime('%Y-%m-%d 00:00:00'))]"/>
+                <filter string="Created Last 7 Days" name="filter_created_last_7_days"
+                        domain="[('create_date', '&gt;=', (context_today() - datetime.timedelta(days=7)).strftime('%Y-%m-%d 00:00:00'))]"/>
+                <filter string="Updated Today" name="filter_updated_today"
+                        domain="[('write_date', '&gt;=', context_today().strftime('%Y-%m-%d 00:00:00')),
+                                 ('write_date', '&lt;=', context_today().strftime('%Y-%m-%d 23:59:59'))]"/>
+                <filter string="Updated This Week" name="filter_updated_this_week"
+                        domain="[('write_date', '&gt;=', (context_today() - datetime.timedelta(days=context_today().weekday())).strftime('%Y-%m-%d 00:00:00'))]"/>
+                <filter string="Visited Today" name="filter_visited_today"
+                        domain="[('state', '=', 'done'),
+                                 ('date_visited', '&gt;=', context_today().strftime('%Y-%m-%d 00:00:00')),
+                                 ('date_visited', '&lt;=', context_today().strftime('%Y-%m-%d 23:59:59'))]"/>
+
+                <separator/>
+                <!-- Date Period Picker Filters -->
+                <filter string="Date Booked" name="filter_date_booked" date="date_booked"/>
+                <filter string="Created On" name="filter_create_date" date="create_date"/>
+                <filter string="Updated On" name="filter_write_date" date="write_date"/>
+                <filter string="Date Visited" name="filter_date_visited" date="date_visited"/>
+
+                <!-- Comprehensive Group By Options -->
+                <group name="group_by">
+                    <filter string="Person Going (Primary Rep)" name="group_by_user" context="{'group_by': 'user_id'}"/>
+                    <filter string="Actual Visitor Who Went" name="group_by_actual_visitor" context="{'group_by': 'actual_visitor_id'}"/>
+                    <filter string="Customer / Company" name="group_by_partner" context="{'group_by': 'partner_id'}"/>
                     <filter string="Lead / Opportunity" name="group_by_lead" context="{'group_by': 'lead_id'}"/>
-                    <filter string="Date Booked" name="group_by_date" context="{'group_by': 'date_booked:day'}"/>
+                    <filter string="Area / Address / City" name="group_by_city" context="{'group_by': 'city'}"/>
+                    <filter string="Status" name="group_by_state" context="{'group_by': 'state'}"/>
+                    <filter string="Overdue Status" name="group_by_is_overdue" context="{'group_by': 'is_overdue'}"/>
+                    <filter string="Reschedules Count" name="group_by_reschedules" context="{'group_by': 'reschedule_count'}"/>
+                    <separator/>
+                    <filter string="Date Booked: Day" name="group_by_date_day" context="{'group_by': 'date_booked:day'}"/>
+                    <filter string="Date Booked: Week" name="group_by_date_week" context="{'group_by': 'date_booked:week'}"/>
+                    <filter string="Date Booked: Month" name="group_by_date_month" context="{'group_by': 'date_booked:month'}"/>
+                    <separator/>
+                    <filter string="Created On: Day" name="group_by_create_day" context="{'group_by': 'create_date:day'}"/>
+                    <filter string="Created On: Month" name="group_by_create_month" context="{'group_by': 'create_date:month'}"/>
+                    <separator/>
+                    <filter string="Updated On: Day" name="group_by_write_day" context="{'group_by': 'write_date:day'}"/>
+                    <filter string="Updated On: Month" name="group_by_write_month" context="{'group_by': 'write_date:month'}"/>
                 </group>
             </search>
         </field>
