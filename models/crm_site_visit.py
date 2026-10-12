@@ -213,7 +213,25 @@ class CrmSiteVisit(models.Model):
                         addr_parts = [p for p in [lead.street, lead.street2, lead.city] if p]
                         if addr_parts:
                             vals['address'] = ', '.join(addr_parts)
-        return super().create(vals_list)
+        records = super().create(vals_list)
+        for visit in records:
+            if visit.lead_id and visit.date_booked and visit.state in ('open', 'rescheduled'):
+                booked_date = fields.Datetime.to_datetime(visit.date_booked).date()
+                lead = visit.lead_id
+                if not lead.custom_next_contact_date or lead.custom_next_contact_date > booked_date:
+                    lead.with_context(skip_ensure_activity=True).write({'custom_next_contact_date': booked_date})
+        return records
+
+    def write(self, vals):
+        res = super().write(vals)
+        if 'date_booked' in vals or 'state' in vals:
+            for visit in self:
+                if visit.lead_id and visit.date_booked and visit.state in ('open', 'rescheduled'):
+                    booked_date = fields.Datetime.to_datetime(visit.date_booked).date()
+                    lead = visit.lead_id
+                    if not lead.custom_next_contact_date or lead.custom_next_contact_date > booked_date:
+                        lead.with_context(skip_ensure_activity=True).write({'custom_next_contact_date': booked_date})
+        return res
 
     def action_mark_done(self):
         """Mark site visit as completed / visited."""
