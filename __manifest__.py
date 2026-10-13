@@ -12,8 +12,10 @@ CRM Site Visits Management
 * Audit and manage client reschedule requests.
 * Calendar, list, and form views with quick status transitions.
     """,
-    'author': 'Showline Solutions',
+    'author': 'DraftPOS / Showline Solutions',
+    'website': 'https://draftpos.com',
     'license': 'LGPL-3',
+    'images': ['static/description/icon.png'],
     'depends': ['crm', 'mail'],
     'data': [
         'security/ir.model.access.csv',
