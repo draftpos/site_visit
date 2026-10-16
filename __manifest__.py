@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'CRM Site Visits',
-    'version': '1.0',
+    'version': '1.1',
     'category': 'Sales/CRM',
     'summary': 'Schedule, track, and manage client site visits and reschedules from CRM leads.',
     'description': """

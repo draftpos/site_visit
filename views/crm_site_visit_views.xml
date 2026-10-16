@@ -17,6 +17,7 @@
                 <field name="name" string="Ref"/>
                 <field name="lead_id" string="Lead / Opportunity"/>
                 <field name="partner_id" string="Customer"/>
+                <field name="phone" string="Phone" widget="phone" class="text-nowrap"/>
                 <field name="city" string="Area / City" optional="show"/>
                 <field name="address" string="Site Address" optional="show"/>
                 <field name="date_booked" string="Date Booked"/>
@@ -74,6 +75,7 @@
                         <group string="Booking &amp; Location">
                             <field name="lead_id" string="Lead / Opportunity" options="{'no_create': True}" required="not context.get('default_lead_id')"/>
                             <field name="partner_id" string="Customer / Company"/>
+                            <field name="phone" widget="phone"/>
                             <field name="date_booked" string="Date Booked"/>
                             <field name="original_date" string="Original Booking Date" invisible="not original_date or original_date == date_booked"/>
                             <field name="user_ids" string="Persons Going" widget="many2many_avatar_user" placeholder="Select representatives going..."/>
@@ -127,6 +129,7 @@
                 <field name="name" string="Ref"/>
                 <field name="lead_id" string="Lead / Opportunity"/>
                 <field name="partner_id" string="Customer"/>
+                <field name="phone" string="Phone" filter_domain="[('phone', 'ilike', self)]"/>
                 <field name="city" string="Area / City"/>
                 <field name="address" string="Site Address"/>
                 <field name="user_ids" string="Persons Going"/>

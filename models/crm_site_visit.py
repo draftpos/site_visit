@@ -30,6 +30,15 @@ class CrmSiteVisit(models.Model):
         index=True,
         tracking=True
     )
+    phone = fields.Char(
+        string='Phone',
+        compute='_compute_phone',
+        store=True,
+        readonly=False,
+        index=True,
+        tracking=True,
+        help='Contact phone number from the linked lead or customer.'
+    )
     city = fields.Char(
         string='Area / City',
         compute='_compute_city',
@@ -108,6 +117,12 @@ class CrmSiteVisit(models.Model):
         for record in self:
             if not record.city:
                 record.city = record.lead_id.city or record.partner_id.city or False
+
+    @api.depends('lead_id.phone', 'partner_id.phone')
+    def _compute_phone(self):
+        for record in self:
+            if not record.phone:
+                record.phone = record.lead_id.phone or record.partner_id.phone or False
 
     @api.depends('state', 'date_booked')
     def _compute_is_overdue(self):
@@ -193,6 +208,8 @@ class CrmSiteVisit(models.Model):
                     res['lead_id'] = lead.id
                 if 'partner_id' in fields_list and not res.get('partner_id') and lead.partner_id:
                     res['partner_id'] = lead.partner_id.id
+                if 'phone' in fields_list and not res.get('phone'):
+                    res['phone'] = lead.phone or (lead.partner_id and lead.partner_id.phone) or False
                 if 'city' in fields_list and not res.get('city') and lead.city:
                     res['city'] = lead.city
                 if 'address' in fields_list and not res.get('address'):
@@ -211,6 +228,10 @@ class CrmSiteVisit(models.Model):
             addr_parts = [p for p in [self.lead_id.street, self.lead_id.street2, self.lead_id.city] if p]
             if addr_parts:
                 self.address = ', '.join(addr_parts)
+            if self.lead_id.phone and not self.phone:
+                self.phone = self.lead_id.phone
+            elif self.lead_id.partner_id and not self.phone:
+                self.phone = self.lead_id.partner_id.phone or False
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -222,12 +243,14 @@ class CrmSiteVisit(models.Model):
             # Synchronize user_ids and primary user_id
             if vals.get('user_id') and not vals.get('user_ids'):
                 vals['user_ids'] = [(4, vals['user_id'])]
-            # Default partner_id, city and address from lead if blank
+            # Default partner_id, phone, mobile, city and address from lead if blank
             if vals.get('lead_id'):
                 lead = self.env['crm.lead'].browse(vals['lead_id'])
                 if lead.exists():
                     if not vals.get('partner_id') and lead.partner_id:
                         vals['partner_id'] = lead.partner_id.id
+                    if not vals.get('phone'):
+                        vals['phone'] = lead.phone or (lead.partner_id and lead.partner_id.phone) or False
                     if not vals.get('city') and lead.city:
                         vals['city'] = lead.city
                     if not vals.get('address'):
