@@ -7,10 +7,10 @@
         <field name="model">crm.site.visit</field>
         <field name="arch" type="xml">
             <list string="Site Visits" default_order="date_booked desc, id desc"
-                  decoration-danger="is_overdue"
+                  decoration-danger="is_overdue and state not in ('done', 'cancelled')"
+                  decoration-warning="state == 'rescheduled' and not is_overdue"
+                  decoration-info="state == 'open' and not is_overdue"
                   decoration-success="state == 'done'"
-                  decoration-warning="state == 'rescheduled'"
-                  decoration-info="state == 'open'"
                   decoration-muted="state == 'cancelled'"
                   sample="1">
                 <field name="is_overdue" column_invisible="True"/>
@@ -21,23 +21,24 @@
                 <field name="city" string="Area / City" optional="show"/>
                 <field name="address" string="Site Address" optional="show"/>
                 <field name="date_booked" string="Date Booked"/>
+                <field name="date_rescheduled" string="Date Rescheduled" optional="show"/>
                 <field name="user_ids" string="Persons Going" widget="many2many_avatar_user"/>
                 <field name="user_id" column_invisible="True"/>
                 <field name="reschedule_count" string="Reschedules" optional="show"/>
+                <field name="state" string="Status" widget="badge"
+                       decoration-danger="is_overdue and state not in ('done', 'cancelled')"
+                       decoration-warning="state == 'rescheduled' and not is_overdue"
+                       decoration-info="state == 'open' and not is_overdue"
+                       decoration-success="state == 'done'"
+                       decoration-muted="state == 'cancelled'"/>
                 <field name="is_overdue" string="Overdue" widget="badge"
                        decoration-danger="is_overdue"
                        decoration-muted="not is_overdue"
                        optional="show"/>
-                <field name="state" string="Status" widget="badge"
-                       decoration-danger="is_overdue"
-                       decoration-success="state == 'done'"
-                       decoration-warning="state == 'rescheduled'"
-                       decoration-info="state == 'open'"
-                       decoration-muted="state == 'cancelled'"/>
                 <field name="people_seen_count" string="Persons Seen" optional="show"/>
                 <field name="actual_visitor_ids" string="Actual Visitors" widget="many2many_avatar_user" optional="hide"/>
                 <field name="actual_visitor_id" column_invisible="True"/>
-                <field name="date_visited" string="Date Visited" optional="hide"/>
+                <field name="date_visited" string="Date Visited" optional="show"/>
                 <field name="create_date" string="Created On" optional="hide"/>
                 <field name="write_date" string="Updated On" optional="hide"/>
                 <button name="action_mark_done" type="object" string="Mark Done" class="btn-success btn-sm" invisible="state in ('done', 'cancelled')"/>
@@ -86,6 +87,7 @@
 
                         <group string="Rescheduling &amp; Execution Tracking">
                             <field name="reschedule_count" string="Reschedule Count"/>
+                            <field name="date_rescheduled" string="Date Rescheduled" invisible="reschedule_count == 0"/>
                             <field name="reschedule_reason" string="Last Reschedule Reason" invisible="reschedule_count == 0"/>
                             <field name="actual_visitor_ids" string="Persons Who Went" widget="many2many_avatar_user" placeholder="Select representatives who went..."/>
                             <field name="actual_visitor_id" invisible="True"/>
@@ -138,35 +140,58 @@
                 <field name="reschedule_reason" string="Reschedule Reason"/>
 
                 <separator/>
-                <!-- Scheduling & Timeline Filters -->
-                <filter string="To Be Done Today" name="filter_scheduled_today"
+                <!-- Scheduling Timeline Filters -->
+                <filter string="Scheduled Today" name="filter_scheduled_today"
                         domain="[('state', 'in', ['open', 'rescheduled']),
                                  ('date_booked', '&gt;=', context_today().strftime('%Y-%m-%d 00:00:00')),
                                  ('date_booked', '&lt;=', context_today().strftime('%Y-%m-%d 23:59:59'))]"/>
-                <filter string="In Future / Upcoming" name="filter_future"
+                <filter string="Scheduled Yesterday" name="filter_scheduled_yesterday"
                         domain="[('state', 'in', ['open', 'rescheduled']),
-                                 ('date_booked', '&gt;', context_today().strftime('%Y-%m-%d 23:59:59'))]"/>
-                <filter string="To Be Done Tomorrow" name="filter_tomorrow"
+                                 ('date_booked', '&gt;=', (context_today() - datetime.timedelta(days=1)).strftime('%Y-%m-%d 00:00:00')),
+                                 ('date_booked', '&lt;=', (context_today() - datetime.timedelta(days=1)).strftime('%Y-%m-%d 23:59:59'))]"/>
+                <filter string="Scheduled Tomorrow" name="filter_tomorrow"
                         domain="[('state', 'in', ['open', 'rescheduled']),
                                  ('date_booked', '&gt;=', (context_today() + datetime.timedelta(days=1)).strftime('%Y-%m-%d 00:00:00')),
                                  ('date_booked', '&lt;=', (context_today() + datetime.timedelta(days=1)).strftime('%Y-%m-%d 23:59:59'))]"/>
-                <filter string="To Be Done This Week" name="filter_this_week"
+                <filter string="Scheduled This Week" name="filter_this_week"
                         domain="[('state', 'in', ['open', 'rescheduled']),
                                  ('date_booked', '&gt;=', (context_today() - datetime.timedelta(days=context_today().weekday())).strftime('%Y-%m-%d 00:00:00')),
                                  ('date_booked', '&lt;=', (context_today() + datetime.timedelta(days=6-context_today().weekday())).strftime('%Y-%m-%d 23:59:59'))]"/>
-                <filter string="Overdue / Surpassed Deadline" name="filter_overdue" domain="[('is_overdue', '=', True)]"/>
+                <filter string="In Future / Upcoming" name="filter_future"
+                        domain="[('state', 'in', ['open', 'rescheduled']),
+                                 ('date_booked', '&gt;', context_today().strftime('%Y-%m-%d 23:59:59'))]"/>
+                <filter string="Overdue Visits" name="filter_overdue" domain="[('is_overdue', '=', True)]"/>
 
                 <separator/>
-                <!-- Status & Rescheduling Filters -->
-                <filter string="Open / Scheduled" name="filter_open" domain="[('state', 'in', ['open', 'rescheduled'])]"/>
+                <!-- Execution & Visited Filters -->
+                <filter string="Sites Visited" name="filter_sites_visited" domain="[('state', '=', 'done')]"/>
+                <filter string="Visited Today" name="filter_visited_today"
+                        domain="[('state', '=', 'done'),
+                                 ('date_visited', '&gt;=', context_today().strftime('%Y-%m-%d 00:00:00')),
+                                 ('date_visited', '&lt;=', context_today().strftime('%Y-%m-%d 23:59:59'))]"/>
+                <filter string="Visited Yesterday" name="filter_visited_yesterday"
+                        domain="[('state', '=', 'done'),
+                                 ('date_visited', '&gt;=', (context_today() - datetime.timedelta(days=1)).strftime('%Y-%m-%d 00:00:00')),
+                                 ('date_visited', '&lt;=', (context_today() - datetime.timedelta(days=1)).strftime('%Y-%m-%d 23:59:59'))]"/>
+
+                <separator/>
+                <!-- Rescheduled Tracking Filters -->
                 <filter string="Rescheduled" name="filter_rescheduled" domain="[('state', '=', 'rescheduled')]"/>
+                <filter string="Rescheduled Today" name="filter_rescheduled_today"
+                        domain="[('state', '=', 'rescheduled'),
+                                 ('date_rescheduled', '&gt;=', context_today().strftime('%Y-%m-%d 00:00:00')),
+                                 ('date_rescheduled', '&lt;=', context_today().strftime('%Y-%m-%d 23:59:59'))]"/>
+                <filter string="Rescheduled Yesterday" name="filter_rescheduled_yesterday"
+                        domain="[('state', '=', 'rescheduled'),
+                                 ('date_rescheduled', '&gt;=', (context_today() - datetime.timedelta(days=1)).strftime('%Y-%m-%d 00:00:00')),
+                                 ('date_rescheduled', '&lt;=', (context_today() - datetime.timedelta(days=1)).strftime('%Y-%m-%d 23:59:59'))]"/>
                 <filter string="Has Reschedules (&gt; 0)" name="filter_has_reschedules" domain="[('reschedule_count', '&gt;', 0)]"/>
                 <filter string="Never Rescheduled" name="filter_never_rescheduled" domain="[('reschedule_count', '=', 0)]"/>
-                <filter string="Visited / Done" name="filter_done" domain="[('state', '=', 'done')]"/>
-                <filter string="Cancelled" name="filter_cancelled" domain="[('state', '=', 'cancelled')]"/>
 
                 <separator/>
-                <!-- Assignment Filters -->
+                <!-- Status & Assignment Filters -->
+                <filter string="Open / Scheduled" name="filter_open" domain="[('state', 'in', ['open', 'rescheduled'])]"/>
+                <filter string="Cancelled" name="filter_cancelled" domain="[('state', '=', 'cancelled')]"/>
                 <filter string="My Assigned Visits" name="filter_my_visits"
                         domain="['|', ('user_ids', 'in', [uid]), ('actual_visitor_ids', 'in', [uid])]"/>
                 <filter string="My Open Visits" name="filter_my_open_visits"
@@ -187,17 +212,14 @@
                                  ('write_date', '&lt;=', context_today().strftime('%Y-%m-%d 23:59:59'))]"/>
                 <filter string="Updated This Week" name="filter_updated_this_week"
                         domain="[('write_date', '&gt;=', (context_today() - datetime.timedelta(days=context_today().weekday())).strftime('%Y-%m-%d 00:00:00'))]"/>
-                <filter string="Visited Today" name="filter_visited_today"
-                        domain="[('state', '=', 'done'),
-                                 ('date_visited', '&gt;=', context_today().strftime('%Y-%m-%d 00:00:00')),
-                                 ('date_visited', '&lt;=', context_today().strftime('%Y-%m-%d 23:59:59'))]"/>
 
                 <separator/>
-                <!-- Date Period Picker Filters -->
+                <!-- Date Period Picker Filters (Drilldowns) -->
                 <filter string="Date Booked" name="filter_date_booked" date="date_booked"/>
+                <filter string="Date Visited" name="filter_date_visited" date="date_visited"/>
+                <filter string="Date Rescheduled" name="filter_date_rescheduled" date="date_rescheduled"/>
                 <filter string="Created On" name="filter_create_date" date="create_date"/>
                 <filter string="Updated On" name="filter_write_date" date="write_date"/>
-                <filter string="Date Visited" name="filter_date_visited" date="date_visited"/>
 
                 <!-- Comprehensive Group By Options -->
                 <group name="group_by">
@@ -213,6 +235,11 @@
                     <filter string="Date Booked: Day" name="group_by_date_day" context="{'group_by': 'date_booked:day'}"/>
                     <filter string="Date Booked: Week" name="group_by_date_week" context="{'group_by': 'date_booked:week'}"/>
                     <filter string="Date Booked: Month" name="group_by_date_month" context="{'group_by': 'date_booked:month'}"/>
+                    <separator/>
+                    <filter string="Date Visited: Day" name="group_by_date_visited_day" context="{'group_by': 'date_visited:day'}"/>
+                    <filter string="Date Visited: Month" name="group_by_date_visited_month" context="{'group_by': 'date_visited:month'}"/>
+                    <separator/>
+                    <filter string="Date Rescheduled: Day" name="group_by_date_rescheduled_day" context="{'group_by': 'date_rescheduled:day'}"/>
                     <separator/>
                     <filter string="Created On: Day" name="group_by_create_day" context="{'group_by': 'create_date:day'}"/>
                     <filter string="Created On: Month" name="group_by_create_month" context="{'group_by': 'create_date:month'}"/>

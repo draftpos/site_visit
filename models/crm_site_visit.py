@@ -99,6 +99,13 @@ class CrmSiteVisit(models.Model):
         copy=False,
         help='Number of times the visit was rescheduled.'
     )
+    date_rescheduled = fields.Datetime(
+        string='Date Rescheduled',
+        readonly=True,
+        copy=False,
+        tracking=True,
+        help='Date and time when the visit was last rescheduled.'
+    )
     reschedule_reason = fields.Text(
         string='Last Reschedule Reason',
         copy=False,
@@ -273,6 +280,8 @@ class CrmSiteVisit(models.Model):
         return records
 
     def write(self, vals):
+        if vals.get('state') == 'rescheduled' and not vals.get('date_rescheduled'):
+            vals['date_rescheduled'] = fields.Datetime.now()
         res = super().write(vals)
         leads = self.mapped('lead_id')
         if leads:

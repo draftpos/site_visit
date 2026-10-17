@@ -50,6 +50,7 @@ class CrmSiteVisitRescheduleWizard(models.TransientModel):
         vals = {
             'date_booked': self.new_date,
             'state': 'rescheduled',
+            'date_rescheduled': fields.Datetime.now(),
             'reschedule_count': visit.reschedule_count + 1,
             'reschedule_reason': self.reason,
         }
