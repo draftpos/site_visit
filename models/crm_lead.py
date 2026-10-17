@@ -41,7 +41,7 @@ class CrmLead(models.Model):
             ('open', 'Open / Scheduled'),
             ('rescheduled', 'Rescheduled'),
             ('rescheduled_overdue', 'Rescheduled (Overdue)'),
-            ('overdue', 'Overdue / Surpassed Deadline'),
+            ('overdue', 'Overdue'),
             ('done', 'Visited / Done'),
             ('cancelled', 'Cancelled'),
         ],
@@ -57,9 +57,9 @@ class CrmLead(models.Model):
             if not lead.site_visit_ids:
                 lead.site_visit_state = 'none'
             else:
-                open_visits = lead.site_visit_ids.filtered(lambda v: v.state in ('open', 'rescheduled'))
+                open_visits = lead.site_visit_ids.filtered(lambda v: v.state in ('open', 'rescheduled', 'overdue'))
                 if open_visits:
-                    overdue_visits = open_visits.filtered(lambda v: v.is_overdue)
+                    overdue_visits = open_visits.filtered(lambda v: v.is_overdue or v.state == 'overdue')
                     if overdue_visits:
                         # Prioritize rescheduled overdue if any overdue visit is rescheduled
                         if any(v.state == 'rescheduled' for v in overdue_visits):

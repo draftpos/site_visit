@@ -88,9 +88,18 @@ class CrmSiteVisit(models.Model):
     state = fields.Selection([
         ('open', 'Open / Scheduled'),
         ('rescheduled', 'Rescheduled'),
+        ('overdue', 'Overdue'),
         ('done', 'Visited / Done'),
         ('cancelled', 'Cancelled')
     ], string='Status', default='open', required=True, tracking=True, index=True)
+
+    visit_status = fields.Selection([
+        ('open', 'Open / Scheduled'),
+        ('rescheduled', 'Rescheduled'),
+        ('overdue', 'Overdue'),
+        ('done', 'Visited / Done'),
+        ('cancelled', 'Cancelled')
+    ], string='Status', compute='_compute_visit_status', search='_search_visit_status')
 
     reschedule_count = fields.Integer(
         string='Reschedule Count',
@@ -132,13 +141,51 @@ class CrmSiteVisit(models.Model):
                 record.phone = record.lead_id.phone or record.partner_id.phone or False
 
     @api.depends('state', 'date_booked')
+    def _compute_visit_status(self):
+        now = fields.Datetime.now()
+        for record in self:
+            if record.state in ('done', 'cancelled'):
+                record.visit_status = record.state
+            elif (record.date_booked and record.date_booked < now) or record.state == 'overdue':
+                record.visit_status = 'overdue'
+            else:
+                record.visit_status = record.state or 'open'
+
+    def _search_visit_status(self, operator, value):
+        now = fields.Datetime.now()
+        if operator in ('=', '!=', 'in', 'not in'):
+            is_negative = operator in ('!=', 'not in')
+            vals = value if isinstance(value, (list, tuple)) else [value]
+            domains = []
+            if 'done' in vals:
+                domains.append([('state', '=', 'done')])
+            if 'cancelled' in vals:
+                domains.append([('state', '=', 'cancelled')])
+            if 'overdue' in vals:
+                domains.append(['|', ('state', '=', 'overdue'), '&', ('state', 'in', ['open', 'rescheduled']), ('date_booked', '<', now)])
+            if 'open' in vals:
+                domains.append([('state', '=', 'open'), ('date_booked', '>=', now)])
+            if 'rescheduled' in vals:
+                domains.append([('state', '=', 'rescheduled'), ('date_booked', '>=', now)])
+            if not domains:
+                return [(0, '=', 1)] if not is_negative else [(1, '=', 1)]
+            while len(domains) > 1:
+                d1 = domains.pop(0)
+                d2 = domains.pop(0)
+                domains.insert(0, ['|'] + d1 + d2)
+            res_domain = domains[0]
+            if is_negative:
+                return ['!'] + res_domain
+            return res_domain
+        return [('state', operator, value)]
+
+    @api.depends('state', 'date_booked')
     def _compute_is_overdue(self):
         now = fields.Datetime.now()
         for record in self:
             record.is_overdue = bool(
-                record.state in ('open', 'rescheduled') and
-                record.date_booked and
-                record.date_booked < now
+                record.state in ('open', 'rescheduled', 'overdue') and
+                (record.state == 'overdue' or (record.date_booked and record.date_booked < now))
             )
 
     def _search_is_overdue(self, operator, value):
@@ -146,11 +193,16 @@ class CrmSiteVisit(models.Model):
         is_true = (operator == '=' and value) or (operator == '!=' and not value)
         if is_true:
             return [
+                '|',
+                ('state', '=', 'overdue'),
+                '&',
                 ('state', 'in', ['open', 'rescheduled']),
                 ('date_booked', '<', now)
             ]
         else:
             return [
+                '&',
+                ('state', '!=', 'overdue'),
                 '|',
                 ('state', 'not in', ['open', 'rescheduled']),
                 ('date_booked', '>=', now)
