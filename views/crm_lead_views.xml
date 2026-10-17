@@ -20,11 +20,12 @@
             <xpath expr="//notebook[1]" position="inside">
                 <page string="Site Visits" name="site_visits">
                     <field name="site_visit_ids" context="{'default_lead_id': id, 'default_partner_id': partner_id, 'default_address': street}">
-                        <list decoration-danger="is_overdue and state not in ('done', 'cancelled')"
-                              decoration-warning="state == 'rescheduled' and not is_overdue"
-                              decoration-info="state == 'open' and not is_overdue"
-                              decoration-success="state == 'done'"
-                              decoration-muted="state == 'cancelled'">
+                        <list decoration-danger="visit_status == 'overdue'"
+                              decoration-warning="visit_status == 'rescheduled'"
+                              decoration-info="visit_status == 'open'"
+                              decoration-success="visit_status == 'done'"
+                              decoration-muted="visit_status == 'cancelled'">
+                            <field name="state" column_invisible="True"/>
                             <field name="is_overdue" column_invisible="True"/>
                             <field name="name" string="Ref"/>
                             <field name="user_ids" string="Persons Going" widget="many2many_avatar_user"/>
@@ -34,16 +35,12 @@
                             <field name="date_rescheduled" string="Date Rescheduled" optional="show"/>
                             <field name="address" string="Site Address"/>
                             <field name="reschedule_count" string="Reschedules"/>
-                            <field name="state" string="Status" widget="badge"
-                                   decoration-danger="is_overdue and state not in ('done', 'cancelled')"
-                                   decoration-warning="state == 'rescheduled' and not is_overdue"
-                                   decoration-info="state == 'open' and not is_overdue"
-                                   decoration-success="state == 'done'"
-                                   decoration-muted="state == 'cancelled'"/>
-                            <field name="is_overdue" string="Overdue" widget="badge"
-                                   decoration-danger="is_overdue"
-                                   decoration-muted="not is_overdue"
-                                   optional="show"/>
+                            <field name="visit_status" string="Status" widget="badge"
+                                   decoration-danger="visit_status == 'overdue'"
+                                   decoration-warning="visit_status == 'rescheduled'"
+                                   decoration-info="visit_status == 'open'"
+                                   decoration-success="visit_status == 'done'"
+                                   decoration-muted="visit_status == 'cancelled'"/>
                             <field name="people_seen_count" string="Persons Seen" optional="show"/>
                             <field name="actual_visitor_id" string="Actual Visitor" optional="hide"/>
                             <field name="date_visited" string="Date Visited" optional="show"/>
