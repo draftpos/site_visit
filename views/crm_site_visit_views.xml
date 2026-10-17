@@ -7,12 +7,13 @@
         <field name="model">crm.site.visit</field>
         <field name="arch" type="xml">
             <list string="Site Visits" default_order="date_booked desc, id desc"
-                  decoration-danger="is_overdue and state not in ('done', 'cancelled')"
-                  decoration-warning="state == 'rescheduled' and not is_overdue"
-                  decoration-info="state == 'open' and not is_overdue"
-                  decoration-success="state == 'done'"
-                  decoration-muted="state == 'cancelled'"
+                  decoration-danger="visit_status == 'overdue'"
+                  decoration-warning="visit_status == 'rescheduled'"
+                  decoration-info="visit_status == 'open'"
+                  decoration-success="visit_status == 'done'"
+                  decoration-muted="visit_status == 'cancelled'"
                   sample="1">
+                <field name="state" column_invisible="True"/>
                 <field name="is_overdue" column_invisible="True"/>
                 <field name="name" string="Ref"/>
                 <field name="lead_id" string="Lead / Opportunity"/>
@@ -25,16 +26,12 @@
                 <field name="user_ids" string="Persons Going" widget="many2many_avatar_user"/>
                 <field name="user_id" column_invisible="True"/>
                 <field name="reschedule_count" string="Reschedules" optional="show"/>
-                <field name="state" string="Status" widget="badge"
-                       decoration-danger="is_overdue and state not in ('done', 'cancelled')"
-                       decoration-warning="state == 'rescheduled' and not is_overdue"
-                       decoration-info="state == 'open' and not is_overdue"
-                       decoration-success="state == 'done'"
-                       decoration-muted="state == 'cancelled'"/>
-                <field name="is_overdue" string="Overdue" widget="badge"
-                       decoration-danger="is_overdue"
-                       decoration-muted="not is_overdue"
-                       optional="show"/>
+                <field name="visit_status" string="Status" widget="badge"
+                       decoration-danger="visit_status == 'overdue'"
+                       decoration-warning="visit_status == 'rescheduled'"
+                       decoration-info="visit_status == 'open'"
+                       decoration-success="visit_status == 'done'"
+                       decoration-muted="visit_status == 'cancelled'"/>
                 <field name="people_seen_count" string="Persons Seen" optional="show"/>
                 <field name="actual_visitor_ids" string="Actual Visitors" widget="many2many_avatar_user" optional="hide"/>
                 <field name="actual_visitor_id" column_invisible="True"/>
@@ -190,7 +187,7 @@
 
                 <separator/>
                 <!-- Status & Assignment Filters -->
-                <filter string="Open / Scheduled" name="filter_open" domain="[('state', 'in', ['open', 'rescheduled'])]"/>
+                <filter string="Open / Scheduled" name="filter_open" domain="[('state', 'in', ['open', 'rescheduled', 'overdue'])]"/>
                 <filter string="Cancelled" name="filter_cancelled" domain="[('state', '=', 'cancelled')]"/>
                 <filter string="My Assigned Visits" name="filter_my_visits"
                         domain="['|', ('user_ids', 'in', [uid]), ('actual_visitor_ids', 'in', [uid])]"/>
@@ -228,7 +225,7 @@
                     <filter string="Customer / Company" name="group_by_partner" context="{'group_by': 'partner_id'}"/>
                     <filter string="Lead / Opportunity" name="group_by_lead" context="{'group_by': 'lead_id'}"/>
                     <filter string="Area / Address / City" name="group_by_city" context="{'group_by': 'city'}"/>
-                    <filter string="Status" name="group_by_state" context="{'group_by': 'state'}"/>
+                    <filter string="Status" name="group_by_state" context="{'group_by': 'visit_status'}"/>
                     <filter string="Overdue Status" name="group_by_is_overdue" context="{'group_by': 'is_overdue'}"/>
                     <filter string="Reschedules Count" name="group_by_reschedules" context="{'group_by': 'reschedule_count'}"/>
                     <separator/>
